@@ -31,11 +31,19 @@ struct stStackMem_t
 {
 	stCoRoutine_t* occupy_co;
 	int stack_size;
-	char* stack_bp; //stack_buffer + stack_size
-	char* stack_buffer;
+	char* stack_bp; //stack_buffer + stack_size  // fengwen: 相当于stack的上界（即栈底）
+	char* stack_buffer;  // fengwen: stack空间的起始地址
 
 };
 
+// fengwen: 共享栈池
+//			外界通过co_alloc_sharestack创建，来决定共享栈池里有多少个共享栈。
+//			创建协调时，轮流使用池中的栈。
+//
+//			目的是尽量少的进行SaveBuffer内存拷贝。
+//			只有在共享栈被共享时，才会触发SaveBuffer内存拷贝。
+//			比如，一个协程在切换出去时，其他协调用的正好的池中的其他栈，那这个协程就不需要SaveBuffer。
+//			相关代码：co_swap
 struct stShareStack_t
 {
 	unsigned int alloc_idx;
@@ -46,23 +54,23 @@ struct stShareStack_t
 
 
 
-struct stCoRoutine_t
+struct stCoRoutine_t  // fengwen: 协程对象。
 {
 	stCoRoutineEnv_t *env;
-	pfn_co_routine_t pfn;
-	void *arg;
-	coctx_t ctx;
+	pfn_co_routine_t pfn;  // fengwen: 入口函数
+	void *arg;  // fengwen: 入口参数
+	coctx_t ctx;  // ?fengwen: 可能是切换的上下文，包括寄存器和stack地址和大小。
 
-	char cStart;
-	char cEnd;
+	char cStart;  // fengwen: 是否启动过，没启动过的话在resume时用coctx_make初始化协调的ctx和入口函数等。
+	char cEnd;  // fengwen: cEnd == 1 表示用户指定的入口函数已经执行完返回了。
 	char cIsMain;
 	char cEnableSysHook;
-	char cIsShareStack;
+	char cIsShareStack;  // fengwen: 是否使用共享栈
 
 	void *pvEnv;
 
 	//char sRunStack[ 1024 * 128 ];
-	stStackMem_t* stack_mem;
+	stStackMem_t* stack_mem;  // fengwen: 栈内存。根据co_create的attr，决定使用共享栈，或单独开辟空间。
 
 
 	//save satck buffer while confilct on same stack_buffer;

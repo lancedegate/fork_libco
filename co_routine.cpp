@@ -48,7 +48,7 @@ using namespace std;
 stCoRoutine_t *GetCurrCo( stCoRoutineEnv_t *env );
 struct stCoEpoll_t;
 
-struct stCoRoutineEnv_t
+struct stCoRoutineEnv_t  // fengwen: 协程环境，线程本地数据
 {
 	stCoRoutine_t *pCallStack[ 128 ];
 	int iCallStackSize;
@@ -476,6 +476,7 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
 		at.stack_size = 1024 * 1024 * 8;
 	}
 
+	// fengwen: 内存大小对齐4K。（可能是为了与内存页的大小对齐）
 	if( at.stack_size & 0xFFF ) 
 	{
 		at.stack_size &= ~0xFFF;

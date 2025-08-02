@@ -32,8 +32,8 @@ struct coctx_t
 #else
 	void *regs[ 14 ];
 #endif
-	size_t ss_size;
-	char *ss_sp;
+	size_t ss_size;  // fengwen: stack空间大小
+	char *ss_sp;  // fengwen: stack空间起始地址
 	
 };
 

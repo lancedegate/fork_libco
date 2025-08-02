@@ -108,8 +108,12 @@ int coctx_make(coctx_t* ctx, coctx_pfn_t pfn, const void* s, const void* s1) {
 }
 #elif defined(__x86_64__)
 int coctx_make(coctx_t* ctx, coctx_pfn_t pfn, const void* s, const void* s1) {
-  char* sp = ctx->ss_sp + ctx->ss_size - sizeof(void*);
-  sp = (char*)((unsigned long)sp & -16LL);
+  char* sp = ctx->ss_sp + ctx->ss_size - sizeof(void*);  // fengwen: 栈顶存放pfn
+  sp = (char*)((unsigned long)sp & -16LL);  // fengwen: -16 = 0xF...F0，应该是为了内存对齐。
+
+  // fengwen: 问：怎么在主入口函数结束时，回到其他协程中的？
+  //          答：所有协程的入口函数都为CoRoutineFunc，
+  //              此函数中运行用户指定的pfn后，最后执行一次co_yield_env返回到上一层调用者中。
 
   memset(ctx->regs, 0, sizeof(ctx->regs));
   void** ret_addr = (void**)(sp);
@@ -119,6 +123,7 @@ int coctx_make(coctx_t* ctx, coctx_pfn_t pfn, const void* s, const void* s1) {
 
   ctx->regs[kRETAddr] = (char*)pfn;
 
+  // fengwen: 通过rdi和rsi传参
   ctx->regs[kRDI] = (char*)s;
   ctx->regs[kRSI] = (char*)s1;
   return 0;
