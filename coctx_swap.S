@@ -78,6 +78,6 @@ coctx_swap:
 		leaq 8(%rsp), %rsp    ; %rsp += 8 ?? 为什么要重新push函数返回位置？为了避免内存错误时仍能返回到正确的函数位置？
 		pushq 72(%rsi)        ; push(to_co_ctx.regs[9]) 函数返回位置
 
-    movq 64(%rsi), %rsi   ; %rsi = to_co_ctx.regs[8] 被调用者需要恢复rsi(,rdi,rbx,rbp)
+    movq 64(%rsi), %rsi   ; %rsi = to_co_ctx.regs[8] 前面rsi一直被使用，所以最后恢复to_co里的rsi
 	ret
 #endif
