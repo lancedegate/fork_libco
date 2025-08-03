@@ -50,6 +50,29 @@ struct stCoEpoll_t;
 
 struct stCoRoutineEnv_t  // fengwen: 协程环境，线程本地数据
 {
+	// fengwen: 协程的调用栈
+	//			准确的来说，应该是Resume栈，
+	//
+	//			比如 
+	//				CoMain里resume了CoA （create里面也是resume）
+	//				CoA resume CoB，
+	//				CoB resume CoC，
+	//				那么调用栈就是 CoMain -> CoA -> CoB。
+	//
+	//				CoB yield的时候就是到 CoA，CoA yield 的时候就是到 CoMain。
+	//				
+	//				假如一种情况，CoA结束了，CoMain后面直接resume了CoB，
+	//				那么CallStack为：CoMain -> CoB
+	//
+	//				又假如CoMain之后resume了CoC，CoC又resume了CoB，
+	//				那么CallStack为：CoMain -> CoC -> CoB
+	//
+	//				总之，在CallStack里的协程，一定是还没结束的协程。
+	//
+	//			问题：假如有循环resume怎么办，
+	//				  比如： CoMain -> CoA -> CoB -> CoA
+	//				  CoA结束了到CoB，CoB再yield到CoA，会发生什么？
+
 	stCoRoutine_t *pCallStack[ 128 ];
 	int iCallStackSize;
 	stCoEpoll_t *pEpoll;
@@ -236,7 +259,7 @@ void inline PopHead( TLink*apLink )
 }
 
 template <class TNode,class TLink>
-void inline Join( TLink*apLink,TLink *apOther )
+void inline Join( TLink*apLink,TLink *apOther )  // fengwen: 将两个链表连起来。
 {
 	//printf("apOther %p\n",apOther);
 	if( !apOther->head )
@@ -352,7 +375,7 @@ struct stTimeoutItemLink_t
 };
 struct stTimeout_t
 {
-	stTimeoutItemLink_t *pItems;
+	stTimeoutItemLink_t *pItems;  // fengwen: 可能是每毫秒一个Link
 	int iItemSize;
 
 	unsigned long long ullStart;
@@ -375,6 +398,11 @@ void FreeTimeout( stTimeout_t *apTimeout )
 	free( apTimeout->pItems );
 	free ( apTimeout );
 }
+
+// fengwen: 按距离现在的毫秒数，加到apTimeout->pItems里。
+//			超过数组大小的放到距今60秒的那个Link里，这类Item处理超时时，会先取出来，
+//			判断不是超时再调用AddTimeout重新放回数组中，重放回时如果在60秒以内，相当于对准了，不然就再是粗略的放到最后。
+//			相当于一个简化的时间轮。
 int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long long allNow )
 {
 	if( apTimeout->ullStart == 0 )
@@ -410,6 +438,8 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 
 	return 0;
 }
+
+// fengwen: 可能是取出所有超时的stTimeoutItem_t到stTimeoutItemLink_t *apResult
 inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stTimeoutItemLink_t *apResult )
 {
 	if( apTimeout->ullStart == 0 )
