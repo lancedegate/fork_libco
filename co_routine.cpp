@@ -633,6 +633,14 @@ void co_yield_env( stCoRoutineEnv_t *env )
 
 	env->iCallStackSize--;
 
+	// fengwen 2025-08-04: support cyclic resume.  <begin>
+	//			(e.g. coMain<->coA<->coB<->coA. see example_fengwen.cpp)
+	while(last->cEnd && env->iCallStackSize >= 2) {
+		last = env->pCallStack[ env->iCallStackSize - 2 ];
+		env->iCallStackSize--;
+	}
+	// fengwen 2025-08-04: support cyclic resume. <end>
+
 	co_swap( curr, last);
 }
 

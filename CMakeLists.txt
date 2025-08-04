@@ -15,6 +15,7 @@ enable_language(C ASM)
 
 # Add source files
 set(SOURCE_FILES
+        co_comm.cpp
         co_epoll.cpp
         co_hook_sys_call.cpp
         co_routine.cpp
@@ -53,3 +54,5 @@ add_example_target(poll)
 add_example_target(setenv)
 add_example_target(specific)
 add_example_target(thread)
+
+add_example_target(fengwen)
