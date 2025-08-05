@@ -810,6 +810,11 @@ void OnPollProcessEvent( stTimeoutItem_t * ap )
 
 void OnPollPreparePfn( stTimeoutItem_t * ap,struct epoll_event &e,stTimeoutItemLink_t *active )
 {
+	// fengwen: 应该是这样，
+	//			一个stPoll_t里包含了多个stPollItem_t；
+	//			每个Item有事件时，iRaiseCnt++；
+	//			是否超时，是按stPoll_t来算的，任一个Item有事件时，stPoll_t就不算超时。
+
 	stPollItem_t *lp = (stPollItem_t *)ap;
 	lp->pSelf->revents = EpollEvent2Poll( e.events );
 
@@ -852,7 +857,7 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
 			stTimeoutItem_t *item = (stTimeoutItem_t*)result->events[i].data.ptr;
 			if( item->pfnPrepare )
 			{
-				item->pfnPrepare( item,result->events[i],active );
+				item->pfnPrepare( item,result->events[i],active );  // fengwen: 目前主要是针对co_poll_inner()的处理（用epoll来实现poll）
 			}
 			else
 			{
@@ -891,12 +896,12 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
 			}
 			if( lp->pfnProcess )
 			{
-				lp->pfnProcess( lp );
+				lp->pfnProcess( lp );  // fengwen: 超时和激活都是调用这个函数，目前对应的处理都是resume对应的协程。（比如：模拟poll的OnPollProcessEvent，模拟ConditionVarialbe的OnSignalProcessEvent）
 			}
 
 			lp = active->head;
 		}
-		if( pfn )
+		if( pfn )  // fengwen: 传入的pfn，可能主要的作用是返回-1时终止co_eventloop。另外也可以起到App::Loop的效果，因为至少每1ms会调一次（参见：example_thread.cpp）。
 		{
 			if( -1 == pfn( arg ) )
 			{
@@ -1041,7 +1046,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 
     {
 		//clear epoll status and memory
-		RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
+		RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );  // fengwen:这里对应上面的AddTimeout，从Timeout列表中移除掉。
 		for(nfds_t i = 0;i < nfds;i++)
 		{
 			int fd = fds[i].fd;
@@ -1144,7 +1149,7 @@ struct stCoCondItem_t
 
 	stTimeoutItem_t timeout;
 };
-struct stCoCond_t
+struct stCoCond_t  // fengwen: 相当于就是存了个waiters列表
 {
 	stCoCondItem_t *head;
 	stCoCondItem_t *tail;
@@ -1165,7 +1170,7 @@ int co_cond_signal( stCoCond_t *si )
 	}
 	RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &sp->timeout );
 
-	AddTail( co_get_curr_thread_env()->pEpoll->pstActiveList,&sp->timeout );
+	AddTail( co_get_curr_thread_env()->pEpoll->pstActiveList,&sp->timeout );  // fengwen: 通过epoll来激活waiter
 
 	return 0;
 }
@@ -1189,21 +1194,21 @@ int co_cond_timedwait( stCoCond_t *link,int ms )
 {
 	stCoCondItem_t* psi = (stCoCondItem_t*)calloc(1, sizeof(stCoCondItem_t));
 	psi->timeout.pArg = GetCurrThreadCo();
-	psi->timeout.pfnProcess = OnSignalProcessEvent;
+	psi->timeout.pfnProcess = OnSignalProcessEvent;  // fengwen: 超时的时候resume。实际上激话也是用这个pfnProcess来resume。
 
 	if( ms > 0 )
 	{
 		unsigned long long now = GetTickMS();
 		psi->timeout.ullExpireTime = now + ms;
 
-		int ret = AddTimeout( co_get_curr_thread_env()->pEpoll->pTimeout,&psi->timeout,now );
+		int ret = AddTimeout( co_get_curr_thread_env()->pEpoll->pTimeout,&psi->timeout,now );  // fengwen: 加到超时列表中
 		if( ret != 0 )
 		{
 			free(psi);
 			return ret;
 		}
 	}
-	AddTail( link, psi);
+	AddTail( link, psi);  // fengwen: 加到CoCond(waiters)列表中
 
 	co_yield_ct();
 

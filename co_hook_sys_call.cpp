@@ -577,13 +577,17 @@ ssize_t recv( int socket, void *buffer, size_t length, int flags )
 
 extern int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeout, poll_pfn_t pollfunc);
 
+// fengwen: 重载系统的poll，调用co_poll_inner，最终用epoll来实现。
 int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 {
 	HOOK_SYS_FUNC( poll );
 
+	// fengwen: 直接调用系统的poll的情况
 	if (!co_is_enable_sys_hook() || timeout == 0) {
 		return g_sys_poll_func(fds, nfds, timeout);
 	}
+
+	// fengwen: 如果有同一个fd在fds数组里用多个元素关注了不同的事件，则把它们在fds_merge数组里合并成一个元素。
 	pollfd *fds_merge = NULL;
 	nfds_t nfds_merge = 0;
 	std::map<int, int> m;  // fd --> idx
@@ -602,6 +606,8 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 		}
 	}
 
+	// fengwen: 如果不需要合并，则用原来的fds直接调用co_poll_inner；
+	//			否则用fds_merge调用，并在返回时，给原fds填上revents，即发生的事件。
 	int ret = 0;
 	if (nfds_merge == nfds || nfds == 1) {
 		ret = co_poll_inner(co_get_epoll_ct(), fds, nfds, timeout, g_sys_poll_func);

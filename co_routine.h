@@ -73,7 +73,7 @@ void 	co_disable_hook_sys();
 bool 	co_is_enable_sys_hook();
 
 //6.sync
-struct stCoCond_t;
+struct stCoCond_t;  // fengwen: CoCond类似于C++的ConditionVariable，通过wait和signal实现协程间的同步
 
 stCoCond_t *co_cond_alloc();
 int co_cond_free( stCoCond_t * cc );
